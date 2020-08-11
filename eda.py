@@ -1,6 +1,9 @@
 import pandas as pd
+import os
 
-mydat = pd.read_csv('~/Junior_Python/Placement_Data_Full_Class.csv')
+wd = os.path.abspath(os.getcwd())
+
+mydat = pd.read_csv(wd + '/Placement_Data_Full_Class.csv')
 print(type(mydat))
 
 # 維度
@@ -107,7 +110,7 @@ for i in range(n_row):
             axes[i,j].set_title(categorical_cols[count], fontsize=15)
             count+=1
 
-#plt.savefig('/home/finepin/Junior_Python/categorical_eda1.png')
+#plt.savefig(wd + '/categorical_eda1.png')
 
 
 ### Which variable is associated with the "status" variable
@@ -131,7 +134,7 @@ for i in range(len(plot_numeric_cols)):
 
 axes[0].set_title('EDA of Numeric Variables', fontsize=20)
 
-#plt.savefig('/home/finepin/Junior_Python/numeric_eda.png')
+#plt.savefig(wd + '/Junior_Python/numeric_eda.png')
 
 ##### catgorical variables
 plot_categorical_cols = categorical_cols[categorical_cols != 'status']

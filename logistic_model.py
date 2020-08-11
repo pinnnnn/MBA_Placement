@@ -2,8 +2,10 @@ import pandas as pd
 import numpy as np
 import math
 import sys
+import os
 
-mydat = pd.read_csv('~/Junior_Python/Placement_Data_Full_Class.csv')
+wd = os.path.abspath(os.getcwd())
+mydat = pd.read_csv(wd + '/Placement_Data_Full_Class.csv')
 
 # Build Model
 ### Logistic Regression
@@ -87,7 +89,7 @@ for i, scoring in enumerate(scorings):
 
 
 metrics = pd.concat(metrics, axis=0)
-#metrics.to_csv('/home/finepin/Junior_Python/LR_metrics_balanced.csv', index=False)
+#metrics.to_csv(wd + '/LR_metrics_balanced.csv', index=False)
 
 print(metrics)
 print(X.columns)
