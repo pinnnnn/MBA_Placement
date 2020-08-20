@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+from scipy import stats
 
 wd = os.path.abspath(os.getcwd())
 
@@ -169,4 +170,16 @@ for i in range(n_row):
 
     if end:
         break
-#plt.show()ddd
+#plt.show()
+
+# chi-square independence test
+outcome = 'status'
+cols = ['gender','specialisation','hsc_s','degree_t','workex','ssc_b','hsc_b']
+p_value = {}
+for i in range(len(cols)):
+    col = cols[i]
+    contingency_table = pd.crosstab(index=mydat[outcome], columns=mydat[col])
+    chi2, p, dof, expected = stats.chi2_contingency(contingency_table, correction=False)
+    p_value.update({col:p})
+
+print(p_value)
