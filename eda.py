@@ -172,6 +172,10 @@ for i in range(n_row):
         break
 #plt.show()
 
+# data transfomation and normality test
+
+
+
 # chi-square independence test
 outcome = 'status'
 cols = ['gender','specialisation','hsc_s','degree_t','workex','ssc_b','hsc_b']
