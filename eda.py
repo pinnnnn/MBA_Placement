@@ -98,6 +98,22 @@ import numpy as np
 import seaborn as sns
 
 ### Single variable distribution check
+##### Numeric Variables
+plot_numeric_cols = [nc for nc in numeric_cols if nc not in ['sl_no']]
+n_row = 3
+n_col = 2
+fig, axes = plt.subplots(nrows=n_row, ncols=n_col, figsize=(8,7))
+plt.subplots_adjust(hspace=0.7)
+count=0
+for i in range(n_row):
+    for j in range(n_col):
+        sns.distplot(mydat[plot_numeric_cols[count]],
+            ax=axes[i,j])
+        axes[i,j].set_title(plot_numeric_cols[count], fontsize=15)
+        count+=1
+
+plt.savefig(wd + '/numeric_dist.png')
+
 ##### Categorical Variables
 n_row = 4
 n_col = 2
@@ -117,7 +133,6 @@ for i in range(n_row):
 ### Which variable is associated with the "status" variable
 ##### Numeric variables
 plot_numeric_cols = [nc for nc in numeric_cols if nc not in ['sl_no']]
-print(plot_numeric_cols)
 
 fig, axes = plt.subplots(nrows=len(plot_numeric_cols), ncols=1, figsize=(7,10))
 for i in range(len(plot_numeric_cols)):
@@ -175,10 +190,9 @@ for i in range(n_row):
 # data transfomation and normality test
 
 
-
 # chi-square independence test
 outcome = 'status'
-cols = ['gender','specialisation','hsc_s','degree_t','workex','ssc_b','hsc_b']
+cols = categorical_cols[categorical_cols!='status']
 p_value = {}
 for i in range(len(cols)):
     col = cols[i]
