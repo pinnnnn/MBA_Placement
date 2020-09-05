@@ -1,6 +1,9 @@
 import pandas as pd
 import os
 from scipy import stats
+from statsmodels.stats import anova
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
 
 wd = os.path.abspath(os.getcwd())
 
@@ -34,11 +37,11 @@ print((not_placed == salary_missing).all())
 
 
 # numeric distribution
-### distribution
+## distribution
 pd.set_option("display.max_columns", 15)
 print(mydat.describe(include=[np.number]))
 
-### outlier detect
+## outlier detect
 def inRangeCheck(x, left, right): # x: series, left: int, right: int; outlier: list
     #outlier = [x[i] for i in range(len(x)) if x[i]<left] + [x[i] for i in range(len(x)) if x[i]>right]
     outlier = pd.concat([x[x<left], x[x>right]]).sort_values()
@@ -71,7 +74,7 @@ for i in range(len(outlier_normal)):
 
 print("outlier_len: ", outlier_len, '\n\n')
 
-### correlation
+## correlation
 corr = mydat.loc[:,numeric_cols].corrwith(mydat['salary'])
 print(corr)
 
@@ -97,8 +100,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
-### Single variable distribution check
-##### Numeric Variables
+## Single variable distribution check
+### Numeric Variables
 plot_numeric_cols = [nc for nc in numeric_cols if nc not in ['sl_no']]
 n_row = 3
 n_col = 2
@@ -112,9 +115,25 @@ for i in range(n_row):
         axes[i,j].set_title(plot_numeric_cols[count], fontsize=15)
         count+=1
 
-plt.savefig(wd + '/numeric_dist.png')
+#plt.savefig(wd + '/numeric_dist.png')
+#plt.show()
 
-##### Categorical Variables
+#### box plot
+fig, axes = plt.subplots(nrows=n_row, ncols=n_col)
+plt.subplots_adjust(hspace=0.7)
+
+count=0
+for i in range(n_row):
+    for j in range(n_col):
+        sns.boxplot(mydat[plot_numeric_cols[count]],
+            ax=axes[i,j])
+        axes[i,j].set_title(plot_numeric_cols[count], fontsize=15)
+        count+=1
+
+#plt.show()
+
+
+### Categorical Variables
 n_row = 4
 n_col = 2
 fig, axes = plt.subplots(nrows=n_row, ncols=n_col, figsize=(10,7))
@@ -130,8 +149,8 @@ for i in range(n_row):
 #plt.savefig(wd + '/categorical_eda1.png')
 
 
-### Which variable is associated with the "status" variable
-##### Numeric variables
+## Which variable is associated with the "status" variable
+### Numeric variables
 plot_numeric_cols = [nc for nc in numeric_cols if nc not in ['sl_no']]
 
 fig, axes = plt.subplots(nrows=len(plot_numeric_cols), ncols=1, figsize=(7,10))
@@ -152,7 +171,7 @@ axes[0].set_title('EDA of Numeric Variables', fontsize=20)
 
 #plt.savefig(wd + '/Junior_Python/numeric_eda.png')
 
-##### catgorical variables
+### catgorical variables
 plot_categorical_cols = categorical_cols[categorical_cols != 'status']
 #cross_dat = pd.crosstab(index=mydat['status'], columns=[mydat['workex']])
 
@@ -187,17 +206,54 @@ for i in range(n_row):
         break
 #plt.show()
 
-# data transfomation and normality test
 
+# Test of different mean of every numeric variable
+# #Before hypothesis test we first do data transfomation and normality test
+# #salary, etest_p seem to be more likely to be transform to normality
+# #Seems etest_p is a little right skrew
+
+#lm_model = sm.ols('etest_p~status', data=mydat).fit()
+#print(pd.Series(lm_model.fittedvalues).unique())
+#sns.distplot(lm_model.resid)
+#plt.show()
+
+mydat['etest_p_trans0'] = mydat['etest_p'] ** .1
+#lm_model = sm.ols('etest_p_trans0~status', data=mydat).fit()
+#sns.distplot(lm_model.resid)
+#plt.show()
+
+mydat['etest_p_trans'] = (mydat['etest_p_trans0']-min(mydat['etest_p_trans0']))*100/(max(mydat['etest_p_trans0'])-min(mydat['etest_p_trans0']))
+
+test_numeric_cols = plot_numeric_cols
+test_numeric_cols = ['etest_p_trans' if col == 'etest_p' else col for col in test_numeric_cols]
+test_numeric_cols.remove('salary')
+
+t_test = pd.DataFrame(columns=['coef','se','tvalue','pvalue'])
+for col in test_numeric_cols:
+    X=np.array(mydat['status'].map({'Placed':1, 'Not Placed':0}))
+    X = sm.add_constant(X)
+    Y = np.array(mydat[col])
+    temp = sm.OLS(Y,X).fit()
+
+    df_temp = pd.DataFrame({'coef':[temp.params[1]],
+        'se':[temp.bse[1]],
+        'tvalue':[temp.tvalues[1]],
+        'pvalue':[temp.pvalues[1]]})
+    t_test = t_test.append(df_temp, ignore_index=True)
+
+t_test.index = test_numeric_cols
+t_test = t_test.apply(lambda x: round(x,2) , axis=0)
+print(t_test)
 
 # chi-square independence test
 outcome = 'status'
 cols = categorical_cols[categorical_cols!='status']
-p_value = {}
+chiind_test = pd.DataFrame(columns=['chi2','pvalue'])
 for i in range(len(cols)):
     col = cols[i]
     contingency_table = pd.crosstab(index=mydat[outcome], columns=mydat[col])
     chi2, p, dof, expected = stats.chi2_contingency(contingency_table, correction=False)
-    p_value.update({col:p})
+    chiind_test = chiind_test.append(pd.DataFrame({'chi2':[chi2], 'pvalue':[p]}))
 
-print(p_value)
+chiind_test.index = cols
+print(chiind_test)
