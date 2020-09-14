@@ -169,7 +169,7 @@ for i in range(len(plot_numeric_cols)):
 
 axes[0].set_title('EDA of Numeric Variables', fontsize=20)
 
-#plt.savefig(wd + '/Junior_Python/numeric_eda.png')
+#plt.savefig(wd + '/numeric_eda.png')
 
 ### catgorical variables
 plot_categorical_cols = categorical_cols[categorical_cols != 'status']
@@ -205,6 +205,7 @@ for i in range(n_row):
     if end:
         break
 #plt.show()
+plt.savefig(wd + '/categorical_cross.png')
 
 
 # Test of different mean of every numeric variable
@@ -212,13 +213,13 @@ for i in range(n_row):
 # #salary, etest_p seem to be more likely to be transform to normality
 # #Seems etest_p is a little right skrew
 
-#lm_model = sm.ols('etest_p~status', data=mydat).fit()
+#lm_model = ols('etest_p~status', data=mydat).fit()
 #print(pd.Series(lm_model.fittedvalues).unique())
 #sns.distplot(lm_model.resid)
 #plt.show()
 
 mydat['etest_p_trans0'] = mydat['etest_p'] ** .1
-#lm_model = sm.ols('etest_p_trans0~status', data=mydat).fit()
+#lm_model = ols('etest_p_trans0~status', data=mydat).fit()
 #sns.distplot(lm_model.resid)
 #plt.show()
 
@@ -256,4 +257,8 @@ for i in range(len(cols)):
     chiind_test = chiind_test.append(pd.DataFrame({'chi2':[chi2], 'pvalue':[p]}))
 
 chiind_test.index = cols
+chiind_test = chiind_test.apply(lambda x: round(x,2), axis=0)
 print(chiind_test)
+
+
+mydat.to_csv(wd+'/Placement_Data_Transformed.csv', index=False)
