@@ -9,9 +9,7 @@ wd = os.path.abspath(os.getcwd())
 mydat = pd.read_csv(wd + '/Placement_Data_Transformed.csv')
 
 """
-A. Feature Selection
-
-- Choose features from EDA result as basic predictors.
+1. Data Preparing
 """
 from sklearn import model_selection
 categorical_predictor = ['gender', 'specialisation', 'workex']
@@ -25,7 +23,7 @@ train_X, test_X, train_Y, test_Y = model_selection.train_test_split(X, Y, test_s
 
 
 """
-B. Model Selection
+2. Model Selection
 
 - Compare models including
     1. Logistic regression
@@ -142,22 +140,22 @@ def DTPerformance(X, Y):
     return({'performance': performance, 'best_estimator': best_estimator})
 
 
-#lr_pb = LRPerformance(train_X,train_Y)
-#svm_pb = SVMPerformance(train_X, train_Y)
-#nb_pb = NBPerformance(train_X, train_Y)
-#dt_pb = DTPerformance(train_X, train_Y)
+lr_pb = LRPerformance(train_X,train_Y)
+svm_pb = SVMPerformance(train_X, train_Y)
+nb_pb = NBPerformance(train_X, train_Y)
+dt_pb = DTPerformance(train_X, train_Y)
 
-#print(lr_pb['best_estimator'])
-#performance_table = pd.concat([lr_pb['performance'],
-#    svm_pb['performance'],
-#    nb_pb['performance'],
-#    dt_pb['performance']], axis=1)
-#performance_table = round(performance_table, 3)
-#print(performance_table)
+print(lr_pb['best_estimator'])
+performance_table = pd.concat([lr_pb['performance'],
+    svm_pb['performance'],
+    nb_pb['performance'],
+    dt_pb['performance']], axis=1)
+performance_table = round(performance_table, 3)
+print(performance_table)
 
 
 """
-C. Feature Selection 2nd time
+3. Select Polynomial Features
 
 - CV to select best feature set from polynomial of the basic predictors.
 - L1 penalty to eliminate redundant variables.
@@ -185,7 +183,7 @@ plt.figure()
 plt.xlabel('Number of features selected')
 plt.ylabel('ROC_AUC score')
 plt.plot(range(1, len(rfecv.grid_scores_)+1), rfecv.grid_scores_)
-#plt.show()
+plt.show()
 
 rfe = RFE(estimator = lr_model, step=1, n_features_to_select=21).fit(train_poly, train_Y)
 poly_variables_rfe = [poly_name[id] for id, x in enumerate(rfe.support_) if x]
@@ -213,6 +211,8 @@ feature_selection_output = pd.DataFrame({
 })
 feature_selection_output.to_csv(wd+'/feature_selection_output.csv', index=False)
 
+print(feature_selection_output)
+
 # Set the final version of FEATURE SET
 stay_id = [id for id, x in enumerate(poly_name) if x in poly_variables_rfe]
 train_X = train_poly[:, stay_id]
@@ -223,29 +223,185 @@ test_X = test_poly[:, stay_id]
 
 
 """
-D. Hyperparameter Tuning
+4. Hyperparameter Tuning
 
 - Tune to the best hyperparameter
 """
 param_grid = {
     'C': np.linspace(1e-5, 1e5, 20),
-    'class_weight': [None, 'balanced']
+    'class_weight': ['balanced']
 }
 
 lr_model = linear_model.LogisticRegression(random_state=random_state, max_iter=max_iter, solver='liblinear')
 lr_cv = GridSearchCV(lr_model, param_grid=param_grid, scoring='roc_auc').fit(train_X, train_Y)
-print(metrics.confusion_matrix(train_Y, lr_cv.predict(train_X)))
 
 dump(lr_cv, wd+'/final_model.joblib')
 
-print(lr_cv.best_score_)
 
-
+# Model Performance
 Y_predict = lr_cv.predict(test_X)
+Y_score = lr_cv.predict_proba(test_X)[:,1]
 
-confusion_matrix = metrics.confusion_matrix(y_true=test_Y, y_pred=Y_predict)
-tn, fp, fn, tp = confusion_matrix.ravel()
-print(confusion_matrix)
-print([tn, fp, fn, tp])
-#accuracy = metrics.accuracy_score(y_true=test_Y, y_pred=Y_predict)
-#sensitivity = metri
+confusion_matrix_train = metrics.confusion_matrix(train_Y, lr_cv.predict(train_X))
+confusion_matrix_train = pd.DataFrame(confusion_matrix_train, index=['Neg','Pos'], columns=['Pred_Neg','Pred_Pos'])
+
+confusion_matrix_test = metrics.confusion_matrix(y_true=test_Y, y_pred=Y_predict)
+#tn, fp, fn, tp = confusion_matrix.ravel()
+confusion_matrix_test = pd.DataFrame(confusion_matrix_test, index=['Neg','Pos'], columns=['Pred_Neg','Pred_Pos'])
+
+roc_auc = metrics.roc_auc_score(y_true=test_Y, y_score=Y_score)
+average_precision = metrics.average_precision_score(y_true=test_Y, y_score=Y_score)
+sensitivity = metrics.recall_score(y_true=test_Y, y_pred=Y_predict)
+specificity = metrics.recall_score(y_true=test_Y, y_pred=Y_predict, pos_label=0)
+accuracy = metrics.accuracy_score(y_true=test_Y, y_pred=Y_predict)
+precision = metrics.precision_score(y_true=test_Y, y_pred=Y_predict)
+precision_neg = metrics.precision_score(y_true=test_Y, y_pred=Y_predict, pos_label=0)
+
+
+
+metrics.plot_roc_curve(estimator=lr_cv.best_estimator_, X=test_X, y=test_Y)
+plt.title('ROC Curve')
+plt.show()
+
+metrics.plot_precision_recall_curve(estimator=lr_cv.best_estimator_, X=test_X, y=test_Y)
+plt.title('Precision-Recall Curve')
+plt.show()
+
+print(lr_cv.best_estimator_)
+print("best roc_auc:",lr_cv.best_score_)
+print('confusion_matrix_train:\n',confusion_matrix_train,'\n')
+
+print('confusion_matrix_test:\n', confusion_matrix_test)
+print(pd.Series({
+    'roc_auc': roc_auc, 'average_precision':average_precision,
+    'accuracy':accuracy, 'sensitivity':sensitivity, 'specificity':specificity,
+    'precision':precision, 'precision_neg':precision_neg
+}))
+
+
+# Feature Impact
+pd_coef = pd.DataFrame({'Feature Name': poly_variables_rfe, 'Coefficient': lr_cv.best_estimator_.coef_[0,:]})
+
+
+feature_selection_output = pd.merge(feature_selection_output, pd_coef, left_on='Feature Name', right_on='Feature Name', how='outer')
+print(feature_selection_output)
+
+default_value = X.loc[:,['ssc_p','hsc_p','degree_p','etest_p_trans']].apply(lambda x: sum(x)/len(x), axis=0)
+default_value = round(default_value, 0).tolist()
+
+def makeSample(moving_variable=None, fixed_variable=None, default_value=default_value):
+    """
+    To generate sample with some variable values being fixed & ONE variable value moving.
+    The sample would be transformed to polynomial and be selected as the feature set we've selected.
+
+    * moving_variable is a dict with only one element. The key is column name. The value could be a number or list containing multiple numbers.
+    * fixed_variable is a dict containing one or multiple elements. The keys are column names. The values could only be a number.
+    * The default values of the categoricals are 0, and which of the numericals are 50.
+    """
+
+    columns0=['gender_M','specialisation_Mkt&HR','workex_Yes','ssc_p','hsc_p','degree_p','etest_p_trans']
+    values0 = [0,0,0]+default_value
+
+    if fixed_variable is None:
+        X = values0
+    else:
+        change_names = [x for x in fixed_variable.keys()] # would be a list even if theres only one element
+        change_values = [x for x in fixed_variable.values()] # would be a list even if theres only one element
+        change_id = [id for cn in change_names for id, x in enumerate(columns0) if x == cn]
+
+        X = values0
+        for ind in range(len(change_names)):
+            X[change_id[ind]] = change_values[ind]
+
+
+    if moving_variable is None:
+        N=1
+        moving_name = [None]
+        moving_value = []
+    else:
+        moving_name = [x for x in moving_variable.keys()][0]
+        moving_value = [x for x in moving_variable.values()][0] # would have been a double list if not choosing the first element
+        N = len(moving_value)
+
+
+    X = np.array(X*N)
+    X = np.reshape(X, (N,7))
+    moving_id = [id for id, x in enumerate(columns0) if x in moving_name][0] # would have been a list if not choosing the first element
+    X[:,moving_id] = moving_value
+    X = pd.DataFrame(X, columns=columns0)
+
+    X_poly = poly.fit_transform(X)
+    poly_name = poly.get_feature_names(X.columns)
+
+    stay_id= [i for i, x in enumerate(poly_name) if x in poly_variables_rfe]
+    X_poly = X_poly[:,stay_id]
+
+
+    return(X_poly)
+
+
+def makeComparisonSample(categoricals, numerical):
+    output = []
+    name = []
+    for ind1 in [0,1]:
+        name1 = "".join([categoricals[0], str(ind1)])
+        for ind2 in [0,1]:
+            name2 = "".join([categoricals[1], str(ind2)])
+            for ind3 in [0,1]:
+                name3 = "".join([categoricals[2], str(ind3)])
+                name_temp = " ".join([name1, name2, name3])
+                temp = makeSample(moving_variable={numerical:range(101)}, fixed_variable={categoricals[0]:ind1, categoricals[1]:ind2, categoricals[2]:ind3})
+                output.append(temp)
+                name.append(name_temp)
+    return(output, name) # output is a list made of 4 arrays
+
+
+def plotComparison(labels, categoricals, suptitle):
+
+    # Show the probablity predicted of different
+    numerical_cols = ['ssc_p','hsc_p','degree_p','etest_p_trans']
+    # gender & specialization & numericals
+    s = []
+    s_name = []
+    linestyle = ['solid']*(len(labels)+1)
+    count = 0
+    n_row = 2
+    n_col = 2
+    fig, axes = plt.subplots(nrows=n_row, ncols=n_col, figsize=(10,7))
+    plt.subplots_adjust(hspace=0.7, wspace=0.3)
+    for col in numerical_cols:
+        s_temp, s_name_temp = makeComparisonSample(categoricals=categoricals, numerical=col)
+
+        r_id = count//n_col
+        c_id = count%n_col
+        for ind in range(8):
+            prob_temp = lr_cv.predict_proba(s_temp[ind])[:,0]
+
+            axes[r_id, c_id].plot(range(101), prob_temp, linestyle=linestyle[ind], label=labels[ind])
+        axes[r_id, c_id].set_ylim(-0.1,1.1)
+        axes[r_id, c_id].set_yticks([0,.2,.4,.6,.8,1])
+        axes[r_id, c_id].hlines(y=0.5, xmin=0, xmax=100, linestyles='dashed', colors='gray', linewidth=1)
+        axes[r_id, c_id].set_ylabel('Probability')
+        axes[r_id, c_id].set_xlabel(col)
+        #axes[r_id, c_id].set_title('Prob. of being PLACED')
+        s.append(s_temp)
+        s_name.append(s_name_temp)
+        count+=1
+
+    lines, labels = fig.axes[-1].get_legend_handles_labels()
+    fig.legend(lines, labels, loc = 'right')
+    fig.suptitle(suptitle)
+    return(fig, axes)
+
+
+
+# Create Labels
+label_grid = {'Gender':['Female','Male'], 'Specialization':['Fin','HR'], 'WorkExperience':["Haven't Worked", "Have Worked"]}
+grid = model_selection.ParameterGrid(label_grid)
+labels = []
+for g in grid:
+    temp ="/".join(list(g.values()))
+    labels.append(temp)
+
+plotComparison(labels=labels, categoricals=['gender_M','specialisation_Mkt&HR', 'workex_Yes'], suptitle='Prob. of being PLACED')
+plt.show()
